@@ -1,16 +1,30 @@
-﻿import asyncio
+﻿from __future__ import annotations
+
+import asyncio
 import sys
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters, stdio_client
 
 
-SERVER_FILE = Path(r"D:\Sage\sage_mcp\servers\filesystem.py")
+SERVER_ROOT = Path(r"D:\Sage\sage_mcp\servers")
+
+SERVER_FILES = {
+    "filesystem": SERVER_ROOT / "filesystem.py",
+    "git": SERVER_ROOT / "git.py",
+}
 
 
 class MCPClient:
-    def __init__(self, server_file: Path = SERVER_FILE):
-        self.server_file = server_file
+    def __init__(self, server: str = "filesystem"):
+        if server not in SERVER_FILES:
+            raise ValueError(
+                f"Unknown MCP server: {server}. "
+                f"Available servers: {sorted(SERVER_FILES)}"
+            )
+
+        self.server = server
+        self.server_file = SERVER_FILES[server]
 
     async def list_tools(self):
         server_params = StdioServerParameters(
@@ -49,11 +63,20 @@ class MCPClient:
                 )
 
 
-def list_tools():
-    return asyncio.run(MCPClient().list_tools())
-
-
-def call_tool(name: str, arguments: dict):
+def list_tools(server: str = "filesystem"):
     return asyncio.run(
-        MCPClient().call_tool(name, arguments)
+        MCPClient(server).list_tools()
+    )
+
+
+def call_tool(
+    name: str,
+    arguments: dict,
+    server: str = "filesystem",
+):
+    return asyncio.run(
+        MCPClient(server).call_tool(
+            name,
+            arguments,
+        )
     )

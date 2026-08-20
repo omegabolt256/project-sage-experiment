@@ -44,6 +44,88 @@ class AgentExecutor:
                     },
                 }
 
+        # ------------------------------------------------------------
+        # Deterministic Git operations
+        # ------------------------------------------------------------
+
+        git_text = text.lower()
+
+        if re.search(
+            r"\b(git\s+status|show\s+(me\s+)?the\s+git\s+status|check\s+(the\s+)?git\s+status)\b",
+            git_text,
+        ):
+            return {
+                "use_tool": True,
+                "capability": "git",
+                "tool": "git_status",
+                "arguments": {},
+            }
+
+        if re.search(
+            r"\b(git\s+log|show\s+(me\s+)?(the\s+)?recent\s+git\s+commits|show\s+(me\s+)?git\s+commits)\b",
+            git_text,
+        ):
+            return {
+                "use_tool": True,
+                "capability": "git",
+                "tool": "git_log",
+                "arguments": {
+                    "limit": 10,
+                },
+            }
+
+        if re.search(
+            r"\b(git\s+diff|show\s+(me\s+)?the\s+git\s+diff|show\s+(me\s+)?git\s+changes)\b",
+            git_text,
+        ):
+            return {
+                "use_tool": True,
+                "capability": "git",
+                "tool": "git_diff",
+                "arguments": {},
+            }
+
+        commit_match = re.search(
+            r"(?i)\bcommit\b.*?\bmessage\b\s*:?\s*[\"']?(.+?)[\"']?\s*$",
+            text,
+        )
+
+        if commit_match:
+            message = commit_match.group(1).strip().strip("\"'")
+
+            if message:
+                return {
+                    "use_tool": True,
+                    "capability": "git",
+                    "tool": "git_commit",
+                    "arguments": {
+                        "message": message,
+                    },
+                }
+
+        if re.search(
+            r"(?i)\b(git\s+push|push\s+(the\s+)?git\s+changes|push\s+(the\s+)?changes\s+to\s+(the\s+)?remote)\b",
+            text,
+        ):
+            return {
+                "use_tool": True,
+                "capability": "git",
+                "tool": "git_push",
+                "arguments": {},
+            }
+
+        if re.search(
+            r"(?i)\b(git\s+add|stage\s+(the\s+)?git\s+changes|stage\s+(the\s+)?changes)\b",
+            text,
+        ):
+            return {
+                "use_tool": True,
+                "capability": "git",
+                "tool": "git_add",
+                "arguments": {
+                    "path": ".",
+                },
+            }
         web_patterns = [
             r"\bsearch the web\b",
             r"\bsearch online\b",
@@ -217,11 +299,68 @@ Rules:
             if not isinstance(arguments, dict):
                 raise ValueError("Tool arguments must be an object.")
 
-            if capability_obj.name not in ("filesystem", "document"):
+            if capability_obj.name not in ("filesystem", "document", "git"):
                 self.tools.get(tool_name)
 
         return decision
 
+    def approve(
+        self,
+        approval: dict,
+        conversation_id: str = "default",
+    ) -> dict:
+        """Execute an already-approved action without re-planning."""
+        if not approval.get("approval_required"):
+            raise ValueError("No approval is required for this action.")
+
+        tool_name = approval.get("tool")
+        arguments = approval.get("arguments", {})
+        capability = approval.get("capability")
+
+        if not isinstance(tool_name, str):
+            raise ValueError("Approval does not contain a valid tool.")
+
+        if not isinstance(arguments, dict):
+            raise ValueError("Approval arguments must be an object.")
+
+        capability_obj = self.capabilities.find_for_tool(tool_name)
+
+        if capability_obj is None:
+            raise ValueError(
+                f"Tool '{tool_name}' is not assigned to a capability."
+            )
+
+        if capability_obj.name != capability:
+            raise ValueError(
+                f"Tool '{tool_name}' does not belong to capability "
+                f"'{capability}'."
+            )
+
+        permission = self.permission_policy.check(
+            tool_name,
+            arguments,
+        )
+
+        if not permission.requires_approval:
+            raise ValueError(
+                f"Tool '{tool_name}' no longer requires approval."
+            )
+
+        result = self._execute_tool(
+            capability_obj.name,
+            tool_name,
+            arguments,
+            conversation_id,
+        )
+
+        return {
+            "used_tool": True,
+            "approved": True,
+            "capability": capability,
+            "tool": tool_name,
+            "arguments": arguments,
+            "result": result,
+        }
     def run(
         self,
         message: str,
@@ -264,8 +403,33 @@ Rules:
                 "decision": decision,
             }
 
+        result = self._execute_tool(
+            capability_obj.name,
+            tool_name,
+            arguments,
+            conversation_id,
+        )
+
+        return {
+            "used_tool": True,
+            "capability": capability,
+            "tool": tool_name,
+            "arguments": arguments,
+            "result": result,
+            "decision": decision,
+        }
+
+    def _execute_tool(
+        self,
+        capability_name: str,
+        tool_name: str,
+        arguments: dict,
+        conversation_id: str = "default",
+    ):
+        """Execute a validated tool action."""
+
         # MCP filesystem tools
-        if capability_obj.name == "filesystem":
+        if capability_name == "filesystem":
             result = call_tool(
                 tool_name,
                 arguments,
@@ -277,34 +441,41 @@ Rules:
                     result,
                 )
 
+            return result
+
         # Docling document ingestion
-        elif capability_obj.name == "document":
-            result = self.docling_ingestor.ingest(
+        elif capability_name == "document":
+            return self.docling_ingestor.ingest(
                 conversation_id=conversation_id,
                 source=arguments["source"],
             )
 
+        # Git MCP tools
+        elif capability_name == "git":
+            result = call_tool(
+                tool_name,
+                arguments,
+                server="git",
+            )
+
+            if hasattr(result, "structured_content"):
+                result = result.structured_content.get(
+                    "result",
+                    result,
+                )
+
+            return result
+
         # Playwright browser tools
-        elif capability_obj.name == "browser":
-            result = self.tools.execute(
+        elif capability_name == "browser":
+            return self.tools.execute(
                 tool_name,
                 **arguments,
             )
 
         # Native Sage tools
         else:
-            result = self.tools.execute(
+            return self.tools.execute(
                 tool_name,
                 **arguments,
             )
-
-        return {
-            "used_tool": True,
-            "capability": capability,
-            "tool": tool_name,
-            "arguments": arguments,
-            "result": result,
-            "decision": decision,
-        }
-
-

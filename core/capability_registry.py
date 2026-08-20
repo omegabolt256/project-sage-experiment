@@ -52,6 +52,23 @@ def create_capability_router() -> CapabilityRouter:
 
     router.register(
         Capability(
+            name="git",
+            description=(
+                "Inspect and modify the Sage Git repository "
+                "through controlled Git operations."
+            ),
+            tools=(
+                "git_status",
+                "git_log",
+                "git_diff",
+                "git_add",
+                "git_commit",
+                "git_push",
+            ),
+        )
+    )
+    router.register(
+        Capability(
             name="research",
             description=(
                 "Find, retrieve, inspect, compare, and synthesize "
@@ -134,5 +151,6 @@ def create_capability_router() -> CapabilityRouter:
     )
 
     return router
+
 
 

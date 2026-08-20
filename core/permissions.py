@@ -60,6 +60,10 @@ class PermissionPolicy:
             "remember": RiskLevel.APPROVAL,
 
             # Future high-impact operations
+            "git_status": RiskLevel.SAFE,
+            "git_log": RiskLevel.SAFE,
+            "git_diff": RiskLevel.SAFE,
+            "git_add": RiskLevel.APPROVAL,
             "git_commit": RiskLevel.APPROVAL,
             "git_push": RiskLevel.DANGEROUS,
             "delete_file": RiskLevel.DANGEROUS,
@@ -114,3 +118,4 @@ class PermissionPolicy:
                 arguments=arguments,
                 reason=decision.reason,
             )
+

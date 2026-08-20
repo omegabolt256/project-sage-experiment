@@ -61,6 +61,10 @@ class PermissionPolicy:
 
             # Future high-impact operations
             "git_status": RiskLevel.SAFE,
+            "sqlite_list_tables": RiskLevel.SAFE,
+            "sqlite_schema": RiskLevel.SAFE,
+            "sqlite_query": RiskLevel.SAFE,
+            "sqlite_execute": RiskLevel.APPROVAL,
             "git_log": RiskLevel.SAFE,
             "git_diff": RiskLevel.SAFE,
             "git_add": RiskLevel.APPROVAL,
@@ -118,4 +122,5 @@ class PermissionPolicy:
                 arguments=arguments,
                 reason=decision.reason,
             )
+
 

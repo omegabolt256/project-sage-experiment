@@ -12,6 +12,7 @@ SERVER_ROOT = Path(r"D:\Sage\sage_mcp\servers")
 SERVER_FILES = {
     "filesystem": SERVER_ROOT / "filesystem.py",
     "git": SERVER_ROOT / "git.py",
+    "sqlite": SERVER_ROOT / "sqlite.py",
 }
 
 
@@ -80,3 +81,4 @@ def call_tool(
             arguments,
         )
     )
+

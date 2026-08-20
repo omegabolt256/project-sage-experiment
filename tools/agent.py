@@ -45,6 +45,67 @@ class AgentExecutor:
                 }
 
         # ------------------------------------------------------------
+        # Deterministic SQLite operations
+        # ------------------------------------------------------------
+
+        sqlite_db_match = re.search(
+            r"(?i)([A-Za-z]:\\[^\s]+\.db)",
+            text,
+        )
+
+        if sqlite_db_match:
+            database = sqlite_db_match.group(1).rstrip(".,)")
+
+            execute_prefix = re.search(
+                r"(?is)\bexecute\s+(?:this\s+)?sql\b",
+                text,
+            )
+
+            if execute_prefix:
+                sql_start = text.find(":", sqlite_db_match.end())
+
+                if sql_start != -1:
+                    sql = text[sql_start + 1:].strip()
+
+                    if sql:
+                        return {
+                            "use_tool": True,
+                            "capability": "sqlite",
+                            "tool": "sqlite_execute",
+                            "arguments": {
+                                "database": database,
+                                "sql": sql,
+                            },
+                        }
+            if re.search(
+                r"(?i)\b(show|list)\b.*\b(tables|table names)\b",
+                text,
+            ):
+                return {
+                    "use_tool": True,
+                    "capability": "sqlite",
+                    "tool": "sqlite_list_tables",
+                    "arguments": {
+                        "database": database,
+                    },
+                }
+
+            schema_match = re.search(
+                r"(?i)\bschema\b.*?\btable\s+([A-Za-z_][A-Za-z0-9_]*)",
+                text,
+            )
+
+            if schema_match:
+                return {
+                    "use_tool": True,
+                    "capability": "sqlite",
+                    "tool": "sqlite_schema",
+                    "arguments": {
+                        "database": database,
+                        "table": schema_match.group(1),
+                    },
+                }
+        # ------------------------------------------------------------
         # Deterministic Git operations
         # ------------------------------------------------------------
 
@@ -299,7 +360,7 @@ Rules:
             if not isinstance(arguments, dict):
                 raise ValueError("Tool arguments must be an object.")
 
-            if capability_obj.name not in ("filesystem", "document", "git"):
+            if capability_obj.name not in ("filesystem", "document", "git", "sqlite"):
                 self.tools.get(tool_name)
 
         return decision
@@ -436,10 +497,14 @@ Rules:
             )
 
             if hasattr(result, "structured_content"):
-                result = result.structured_content.get(
-                    "result",
-                    result,
-                )
+                structured = result.structured_content
+
+                if isinstance(structured, dict) and "result" in structured:
+                    result = structured["result"]
+                elif structured is not None:
+                    result = structured
+                elif hasattr(result, "content") and result.content:
+                    result = result.content[0].text
 
             return result
 
@@ -459,13 +524,43 @@ Rules:
             )
 
             if hasattr(result, "structured_content"):
-                result = result.structured_content.get(
-                    "result",
-                    result,
-                )
+                structured = result.structured_content
+
+                if isinstance(structured, dict) and "result" in structured:
+                    result = structured["result"]
+                elif structured is not None:
+                    result = structured
+                elif hasattr(result, "content") and result.content:
+                    result = result.content[0].text
 
             return result
 
+        # SQLite MCP tools
+        elif capability_name == "sqlite":
+            if tool_name == "sqlite_query" and "query" in arguments:
+                arguments = {
+                    **arguments,
+                    "sql": arguments["query"],
+                }
+                arguments.pop("query", None)
+
+            result = call_tool(
+                tool_name,
+                arguments,
+                server="sqlite",
+            )
+
+            if hasattr(result, "structured_content"):
+                structured = result.structured_content
+
+                if isinstance(structured, dict) and "result" in structured:
+                    result = structured["result"]
+                elif structured is not None:
+                    result = structured
+                elif hasattr(result, "content") and result.content:
+                    result = result.content[0].text
+
+            return result
         # Playwright browser tools
         elif capability_name == "browser":
             return self.tools.execute(
@@ -479,3 +574,13 @@ Rules:
                 tool_name,
                 **arguments,
             )
+
+
+
+
+
+
+
+
+
+

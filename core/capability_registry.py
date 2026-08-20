@@ -69,6 +69,21 @@ def create_capability_router() -> CapabilityRouter:
     )
     router.register(
         Capability(
+            name="sqlite",
+            description=(
+                "Inspect and query Sage SQLite databases "
+                "through controlled SQLite operations."
+            ),
+            tools=(
+                "sqlite_list_tables",
+                "sqlite_schema",
+                "sqlite_query",
+                "sqlite_execute",
+            ),
+        )
+    )
+    router.register(
+        Capability(
             name="research",
             description=(
                 "Find, retrieve, inspect, compare, and synthesize "
@@ -151,6 +166,7 @@ def create_capability_router() -> CapabilityRouter:
     )
 
     return router
+
 
 
 

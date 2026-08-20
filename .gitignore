@@ -1,0 +1,50 @@
+﻿# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+.venv-*/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Runtime data
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Sage backups
+backups/
+backup-taskstate-*/
+
+# Browser/runtime artifacts
+browser/.cache/
+browser/downloads/
+browser/screenshots/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Local workspace artifacts
+workspace/*.log
+workspace/*.tmp
+
+# Development backups
+*.bak-*

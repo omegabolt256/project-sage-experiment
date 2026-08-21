@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from core.docling_ingest import DoclingIngestor
 from core.evidence_store import EvidenceStore
+from core.task_manager import TaskManager
 from core.permissions import PermissionPolicy, ApprovalRequired
 from sage_mcp.client import call_tool
 
@@ -17,6 +18,7 @@ from tools.registry import ToolRegistry
 class AgentExecutor:
     inference: InferenceRouter
     tools: ToolRegistry
+    task_manager: TaskManager
 
     def __post_init__(self) -> None:
         self.capabilities = create_capability_router()
@@ -44,6 +46,29 @@ class AgentExecutor:
                     },
                 }
 
+        # ------------------------------------------------------------
+        # Deterministic document ingestion
+        # ------------------------------------------------------------
+
+        document_match = re.search(
+            r"(?i)([A-Za-z]:\\[^\r\n\"']+\.(?:pdf|docx|pptx|xlsx|html|htm|md|txt))",
+            text,
+        )
+
+        if document_match and re.search(
+            r"(?i)\b(ingest|read|process|parse|extract|convert)\b",
+            text,
+        ):
+            source = document_match.group(1).rstrip(".,)")
+
+            return {
+                "use_tool": True,
+                "capability": "document",
+                "tool": "docling_ingest",
+                "arguments": {
+                    "source": source,
+                },
+            }
         # ------------------------------------------------------------
         # Deterministic SQLite operations
         # ------------------------------------------------------------
@@ -414,6 +439,13 @@ Rules:
             conversation_id,
         )
 
+        self.task_manager.record_tool_result(
+            conversation_id,
+            tool_name,
+            arguments,
+            result,
+        )
+
         return {
             "used_tool": True,
             "approved": True,
@@ -469,6 +501,13 @@ Rules:
             tool_name,
             arguments,
             conversation_id,
+        )
+
+        self.task_manager.record_tool_result(
+            conversation_id,
+            tool_name,
+            arguments,
+            result,
         )
 
         return {
@@ -574,13 +613,3 @@ Rules:
                 tool_name,
                 **arguments,
             )
-
-
-
-
-
-
-
-
-
-

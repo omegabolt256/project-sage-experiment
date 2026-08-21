@@ -297,6 +297,7 @@ def create_sage() -> SageCore:
     agent = AgentExecutor(
         inference=inference,
         tools=tools,
+        task_manager=task_manager,
     )
 
     return SageCore(
@@ -308,5 +309,3 @@ def create_sage() -> SageCore:
         task_manager=task_manager,
         research=research,
     )
-
-

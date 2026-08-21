@@ -2,8 +2,6 @@
 
 import re
 
-import httpx
-
 from memory.bridge import MemoryBridge
 
 
@@ -47,24 +45,11 @@ class MemoryManager:
         if not memory:
             raise ValueError("No memory content detected.")
 
-        current = self.bridge.get().strip()
+        return self.bridge.remember(memory)
 
-        if memory.lower() in current.lower():
-            return current
-
-        updated = (
-            f"{current} {memory}".strip()
-            if current
-            else memory
-        )
-
-        payload = {"value": updated}
-
-        response = httpx.patch(
-            f"{self.bridge.base_url}/memory",
-            json=payload,
-            timeout=60.0,
-        )
-        response.raise_for_status()
-
-        return response.json().get("memory", updated)
+    def recall(
+        self,
+        query: str,
+        limit: int = 5,
+    ):
+        return self.bridge.search(query, limit=limit)

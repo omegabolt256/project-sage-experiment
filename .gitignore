@@ -48,3 +48,5 @@ workspace/*.tmp
 
 # Development backups
 *.bak-*
+
+memory/mempalace/

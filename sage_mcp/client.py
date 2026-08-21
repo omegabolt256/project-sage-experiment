@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -15,23 +16,47 @@ SERVER_FILES = {
     "sqlite": SERVER_ROOT / "sqlite.py",
 }
 
+EXTERNAL_SERVERS = {
+    "mempalace": {
+        "command": "mempalace-mcp",
+        "args": [
+            "--palace",
+            os.getenv("SAGE_MEMPALACE_PATH", r"D:\Sage\memory\mempalace"),
+        ],
+    },
+}
+
 
 class MCPClient:
     def __init__(self, server: str = "filesystem"):
-        if server not in SERVER_FILES:
+        if server not in SERVER_FILES and server not in EXTERNAL_SERVERS:
             raise ValueError(
                 f"Unknown MCP server: {server}. "
-                f"Available servers: {sorted(SERVER_FILES)}"
+                f"Available servers: {sorted(set(SERVER_FILES) | set(EXTERNAL_SERVERS))}"
             )
 
         self.server = server
-        self.server_file = SERVER_FILES[server]
+        self.server_file = SERVER_FILES.get(server)
+
+        external = EXTERNAL_SERVERS.get(server)
+        if isinstance(external, dict):
+            self.external_command = external["command"]
+            self.external_args = external.get("args", [])
+        else:
+            self.external_command = external
+            self.external_args = []
 
     async def list_tools(self):
-        server_params = StdioServerParameters(
-            command=sys.executable,
-            args=[str(self.server_file)],
-        )
+        if self.external_command:
+            server_params = StdioServerParameters(
+                command=self.external_command,
+                args=self.external_args,
+            )
+        else:
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=[str(self.server_file)],
+            )
 
         async with stdio_client(server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:
@@ -49,10 +74,16 @@ class MCPClient:
                 ]
 
     async def call_tool(self, name: str, arguments: dict):
-        server_params = StdioServerParameters(
-            command=sys.executable,
-            args=[str(self.server_file)],
-        )
+        if self.external_command:
+            server_params = StdioServerParameters(
+                command=self.external_command,
+                args=self.external_args,
+            )
+        else:
+            server_params = StdioServerParameters(
+                command=sys.executable,
+                args=[str(self.server_file)],
+            )
 
         async with stdio_client(server_params) as (read_stream, write_stream):
             async with ClientSession(read_stream, write_stream) as session:

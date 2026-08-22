@@ -24,6 +24,10 @@ EXTERNAL_SERVERS = {
             os.getenv("SAGE_MEMPALACE_PATH", r"D:\Sage\memory\mempalace"),
         ],
     },
+    "paperfind": {
+        "command": "paper-find-mcp",
+        "args": [],
+    },
 }
 
 
@@ -112,4 +116,3 @@ def call_tool(
             arguments,
         )
     )
-

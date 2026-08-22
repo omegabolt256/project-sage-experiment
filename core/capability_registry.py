@@ -94,6 +94,9 @@ def create_capability_router() -> CapabilityRouter:
                 "web_fetch",
                 "paper_search",
                 "paper_bibtex",
+                "paperfind_search",
+                "paper_download",
+                "paper_read",
             ),
         )
     )

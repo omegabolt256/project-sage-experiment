@@ -3,6 +3,7 @@
 import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from core.docling_ingest import DoclingIngestor
 from core.ocr_ingest import OCRIngestor
 from core.research import ResearchEngine
@@ -14,6 +15,7 @@ from sage_mcp.client import call_tool
 from core.capability_registry import create_capability_router
 from inference.router import InferenceRouter
 from tools.registry import ToolRegistry
+from tools.web_tools import download_pdf
 
 
 @dataclass
@@ -261,6 +263,44 @@ class AgentExecutor:
                     "max_results": 5,
                 },
             }
+        # Deterministic paper-find provider routing
+        provider_patterns = {
+            "google_scholar": r"(?i)\bgoogle\s+scholar\b",
+            "pubmed": r"(?i)\bpubmed\b",
+            "arxiv": r"(?i)\barxiv\b",
+            "semantic": r"(?i)\bsemantic\s+scholar\b",
+            "crossref": r"(?i)\bcrossref\b",
+            "biorxiv": r"(?i)\bbioRxiv\b",
+            "medrxiv": r"(?i)\bmedRxiv\b",
+        }
+
+        for provider, pattern in provider_patterns.items():
+            if re.search(pattern, text):
+                query = re.sub(
+                    pattern,
+                    "",
+                    text,
+                ).strip()
+
+                query = re.sub(
+                    r"(?i)^(please\s+)?"
+                    r"(search|find|look\s+for)\s*"
+                    r"(academic\s+)?(papers?|literature|research)?"
+                    r"\s*(about|on|for|regarding)?\s*",
+                    "",
+                    query,
+                ).strip()
+
+                return {
+                    "use_tool": True,
+                    "capability": "research",
+                    "tool": "paperfind_search",
+                    "arguments": {
+                        "provider": provider,
+                        "query": query or text,
+                        "max_results": 5,
+                    },
+                }
         web_patterns = [
             r"\bsearch the web\b",
             r"\bsearch online\b",
@@ -367,29 +407,92 @@ class AgentExecutor:
                 },
             }
         )
+
         tools.append(
             {
-                "name": "paper_search",
+                "name": "paperfind_search",
                 "description": (
-                    "Search scholarly literature using OpenAlex and "
-                    "store the returned papers in Sage EvidenceStore."
+                    "Search scholarly sources through paper-find-mcp and "
+                    "return paper metadata, IDs, DOI, and available PDF URLs.",
                 ),
                 "parameters": {
                     "type": "object",
                     "properties": {
+                        "provider": {
+                            "type": "string",
+                            "description": "paper-find-mcp search provider.",
+                        },
                         "query": {
                             "type": "string",
                             "description": "Scholarly search query.",
                         },
                         "max_results": {
                             "type": "integer",
-                            "description": "Maximum number of papers to return.",
+                            "description": "Maximum number of papers.",
                         },
                     },
-                    "required": ["query"],
+                    "required": ["provider", "query"],
                 },
             }
         )
+
+        tools.append(
+            {
+                "name": "paper_download",
+                "description": "Download an actual paper PDF through paper-find-mcp.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "provider": {
+                            "type": "string",
+                            "description": "paper-find-mcp download provider.",
+                        },
+                        "paper_id": {
+                            "type": "string",
+                            "description": "Provider-specific paper ID or DOI.",
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": (
+                                "Publisher or direct PDF URL. Required when "
+                                "the provider is google_scholar.",
+                            ),
+                        },
+                        "save_path": {
+                            "type": "string",
+                            "description": "Directory for the downloaded PDF.",
+                        },
+                    },
+                    "required": ["provider", "paper_id"],
+                },
+            }
+        )
+
+        tools.append(
+            {
+                "name": "paper_read",
+                "description": "Read an actual paper through paper-find-mcp as Markdown.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "provider": {
+                            "type": "string",
+                            "description": "paper-find-mcp read provider.",
+                        },
+                        "paper_id": {
+                            "type": "string",
+                            "description": "Provider-specific paper ID or DOI.",
+                        },
+                        "save_path": {
+                            "type": "string",
+                            "description": "Optional directory for paper files.",
+                        },
+                    },
+                    "required": ["provider", "paper_id"],
+                },
+            }
+        )
+
         return tools
 
     def decide(self, message: str) -> dict:
@@ -663,6 +766,135 @@ Rules:
                 query=arguments["query"],
                 max_results=arguments.get("max_results", 5),
             )
+        # paper-find MCP tools
+        elif capability_name == "research" and tool_name in (
+            "paperfind_search",
+            "paper_download",
+            "paper_read",
+        ):
+            provider = arguments.get("provider", "")
+            paper_id = arguments.get("paper_id", "")
+            save_path = arguments.get(
+                "save_path",
+                r"D:\Sage\workspace\papers",
+            )
+
+            search_tools = {
+                "google_scholar": "search_google_scholar",
+                "semantic": "search_semantic",
+                "pubmed": "search_pubmed",
+                "arxiv": "search_arxiv",
+                "crossref": "search_crossref",
+                "biorxiv": "search_biorxiv",
+                "medrxiv": "search_medrxiv",
+                "iacr": "search_iacr",
+                "repec": "search_repec",
+            }
+
+            download_tools = {
+                "semantic": "download_semantic",
+                "pubmed": "download_pubmed",
+                "arxiv": "download_arxiv",
+                "biorxiv": "download_biorxiv",
+                "medrxiv": "download_medrxiv",
+                "iacr": "download_iacr",
+                "repec": "download_repec",
+                "scihub": "download_scihub",
+            }
+
+            read_tools = {
+                "semantic": "read_semantic_paper",
+                "pubmed": "read_pubmed_paper",
+                "arxiv": "read_arxiv_paper",
+                "biorxiv": "read_biorxiv_paper",
+                "medrxiv": "read_medrxiv_paper",
+                "iacr": "read_iacr_paper",
+                "repec": "read_repec_paper",
+                "scihub": "read_scihub_paper",
+            }
+
+            if tool_name == "paperfind_search":
+                mcp_tool = search_tools.get(provider)
+                if not mcp_tool:
+                    raise ValueError(
+                        f"Unsupported paper search provider: {provider}"
+                    )
+
+                mcp_arguments = {
+                    "query": arguments["query"],
+                    "max_results": arguments.get("max_results", 5),
+                }
+
+            elif tool_name == "paper_download":
+                mcp_tool = download_tools.get(provider)
+
+                # Google Scholar is discovery-only in paper-find-mcp.
+                # Fall back to the discovered publisher URL.
+                if provider == "google_scholar":
+                    source_url = arguments.get("url", "").strip()
+
+                    if not source_url:
+                        raise ValueError(
+                            "Google Scholar download requires the paper URL."
+                        )
+
+                    safe_id = re.sub(
+                        r"[^A-Za-z0-9._-]+",
+                        "_",
+                        paper_id,
+                    ).strip("_")
+
+                    destination = str(
+                        Path(save_path) / f"{safe_id or 'paper'}.pdf"
+                    )
+
+                    return download_pdf(
+                        source_url,
+                        destination,
+                    )
+
+                if not mcp_tool:
+                    raise ValueError(
+                        f"Unsupported paper download provider: {provider}"
+                    )
+
+                mcp_arguments = {
+                    "paper_id": paper_id,
+                    "save_path": save_path,
+                }
+
+            else:
+                mcp_tool = read_tools.get(provider)
+                if not mcp_tool:
+                    raise ValueError(
+                        f"Unsupported paper read provider: {provider}"
+                    )
+
+                mcp_arguments = {
+                    "paper_id": paper_id,
+                    "save_path": save_path,
+                }
+
+            result = call_tool(
+                mcp_tool,
+                mcp_arguments,
+                server="paperfind",
+            )
+
+            if hasattr(result, "structured_content"):
+                structured = result.structured_content
+
+                if (
+                    isinstance(structured, dict)
+                    and "result" in structured
+                ):
+                    result = structured["result"]
+                elif structured is not None:
+                    result = structured
+                elif hasattr(result, "content") and result.content:
+                    result = result.content[0].text
+
+            return result
         # Git MCP tools
         elif capability_name == "git":
             result = call_tool(

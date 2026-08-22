@@ -5,6 +5,7 @@ import re
 from dataclasses import dataclass
 from core.docling_ingest import DoclingIngestor
 from core.ocr_ingest import OCRIngestor
+from core.research import ResearchEngine
 from core.evidence_store import EvidenceStore
 from core.task_manager import TaskManager
 from core.permissions import PermissionPolicy, ApprovalRequired
@@ -20,6 +21,7 @@ class AgentExecutor:
     inference: InferenceRouter
     tools: ToolRegistry
     task_manager: TaskManager
+    research: ResearchEngine
 
     def __post_init__(self) -> None:
         self.capabilities = create_capability_router()
@@ -229,6 +231,36 @@ class AgentExecutor:
                     "path": ".",
                 },
             }
+        paper_patterns = [
+            r"\b(search|find|look\s+for)\s+(academic\s+)?papers?\b",
+            r"\b(search|find)\s+(the\s+)?scholarly\s+literature\b",
+            r"\b(search|find)\s+(academic\s+)?research\b",
+            r"\b(scholarly|academic)\s+(papers?|literature|research)\b",
+        ]
+
+        if any(
+            re.search(pattern, text, re.IGNORECASE)
+            for pattern in paper_patterns
+        ):
+            query = re.sub(
+                r"(?i)^(please\s+)?"
+                r"(search|find|look\s+for)\s+"
+                r"(?:(?:the\s+)?academic\s+)?"
+                r"(?:papers?|research|scholarly\s+literature)"
+                r"\s*(?:about|on|for|regarding)?\s*",
+                "",
+                text,
+            ).strip()
+
+            return {
+                "use_tool": True,
+                "capability": "research",
+                "tool": "paper_search",
+                "arguments": {
+                    "query": query or text,
+                    "max_results": 5,
+                },
+            }
         web_patterns = [
             r"\bsearch the web\b",
             r"\bsearch online\b",
@@ -245,7 +277,7 @@ class AgentExecutor:
             for pattern in web_patterns
         ):
             query = re.sub(
-                r"(?i)^(please\s+)?(search the web|search online|search for|look up)\s*",
+                r"(?i)^(please\s+)?(search the web|search online|search for|look up)\s*(?:for\s+)?",
                 "",
                 text,
             ).strip()
@@ -332,6 +364,29 @@ class AgentExecutor:
                         },
                     },
                     "required": ["source"],
+                },
+            }
+        )
+        tools.append(
+            {
+                "name": "paper_search",
+                "description": (
+                    "Search scholarly literature using OpenAlex and "
+                    "store the returned papers in Sage EvidenceStore."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Scholarly search query.",
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "Maximum number of papers to return.",
+                        },
+                    },
+                    "required": ["query"],
                 },
             }
         )
@@ -600,6 +655,13 @@ Rules:
                 conversation_id=conversation_id,
                 source=arguments["source"],
                 title=arguments.get("title", ""),
+            )
+        # OpenAlex scholarly research
+        elif capability_name == "research" and tool_name == "paper_search":
+            return self.research.search_papers(
+                conversation_id=conversation_id,
+                query=arguments["query"],
+                max_results=arguments.get("max_results", 5),
             )
         # Git MCP tools
         elif capability_name == "git":

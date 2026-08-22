@@ -17,6 +17,15 @@ from tools.web import web_search
 from tools.web_tools import fetch_web
 
 
+def _paper_search_registry_handler(
+    query: str,
+    max_results: int = 5,
+):
+    raise RuntimeError(
+        "paper_search requires AgentExecutor context and must be "
+        "executed through Sage's research capability."
+    )
+
 @dataclass
 class SageCore:
     inference: InferenceRouter
@@ -279,6 +288,28 @@ def create_sage() -> SageCore:
             ],
         )
     )
+
+    tools.register(
+        Tool(
+            name="paper_search",
+            description="Search scholarly literature using OpenAlex.",
+            handler=_paper_search_registry_handler,
+            parameters=[
+                ToolParameter(
+                    name="query",
+                    description="Scholarly search query.",
+                    type="string",
+                ),
+                ToolParameter(
+                    name="max_results",
+                    description="Maximum number of papers to return.",
+                    type="integer",
+                    required=False,
+                ),
+            ],
+        )
+    )
+
     tools.register(
         Tool(
             name="remember",
@@ -298,6 +329,7 @@ def create_sage() -> SageCore:
         inference=inference,
         tools=tools,
         task_manager=task_manager,
+        research=research,
     )
 
     return SageCore(

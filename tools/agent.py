@@ -4,6 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 from core.docling_ingest import DoclingIngestor
+from core.ocr_ingest import OCRIngestor
 from core.evidence_store import EvidenceStore
 from core.task_manager import TaskManager
 from core.permissions import PermissionPolicy, ApprovalRequired
@@ -22,7 +23,9 @@ class AgentExecutor:
 
     def __post_init__(self) -> None:
         self.capabilities = create_capability_router()
-        self.docling_ingestor = DoclingIngestor(EvidenceStore())
+        evidence = EvidenceStore()
+        self.docling_ingestor = DoclingIngestor(evidence)
+        self.ocr_ingestor = OCRIngestor(evidence)
         self.permission_policy = PermissionPolicy()
 
     def _deterministic(self, message: str) -> dict | None:
@@ -55,6 +58,20 @@ class AgentExecutor:
             text,
         )
 
+        if document_match and re.search(
+            r"(?i)\b(ocr|optical\s+character|scanned|scan)\b",
+            text,
+        ):
+            source = document_match.group(1).rstrip(".,)")
+
+            return {
+                "use_tool": True,
+                "capability": "document",
+                "tool": "ocr_ingest",
+                "arguments": {
+                    "source": source,
+                },
+            }
         if document_match and re.search(
             r"(?i)\b(ingest|read|process|parse|extract|convert)\b",
             text,
@@ -295,6 +312,29 @@ class AgentExecutor:
             }
         )
 
+        tools.append(
+            {
+                "name": "ocr_ingest",
+                "description": (
+                    "Render a local PDF and extract text with Tesseract OCR "
+                    "when the document is scanned or image-based."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "source": {
+                            "type": "string",
+                            "description": "Local PDF file path to OCR.",
+                        },
+                        "title": {
+                            "type": "string",
+                            "description": "Optional document title.",
+                        },
+                    },
+                    "required": ["source"],
+                },
+            }
+        )
         return tools
 
     def decide(self, message: str) -> dict:
@@ -547,13 +587,20 @@ Rules:
 
             return result
 
-        # Docling document ingestion
+        # Document ingestion
         elif capability_name == "document":
+            if tool_name == "ocr_ingest":
+                return self.ocr_ingestor.ingest(
+                    conversation_id=conversation_id,
+                    source=arguments["source"],
+                    title=arguments.get("title", ""),
+                )
+
             return self.docling_ingestor.ingest(
                 conversation_id=conversation_id,
                 source=arguments["source"],
+                title=arguments.get("title", ""),
             )
-
         # Git MCP tools
         elif capability_name == "git":
             result = call_tool(

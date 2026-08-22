@@ -132,9 +132,13 @@ def create_capability_router() -> CapabilityRouter:
         Capability(
             name="document",
             description=(
-                "Convert documents into structured evidence using Docling."
+                "Convert documents into structured evidence using "
+                "Docling or Tesseract OCR."
             ),
-            tools=("docling_ingest",),
+            tools=(
+                "docling_ingest",
+                "ocr_ingest",
+            ),
         )
     )
 
@@ -166,7 +170,3 @@ def create_capability_router() -> CapabilityRouter:
     )
 
     return router
-
-
-
-

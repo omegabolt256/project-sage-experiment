@@ -28,6 +28,10 @@ EXTERNAL_SERVERS = {
         "command": "paper-find-mcp",
         "args": [],
     },
+    "wigolo": {
+        "command": "npx",
+        "args": ["wigolo"],
+    },
 }
 
 

@@ -385,4 +385,3 @@ def create_sage() -> SageCore:
         task_manager=task_manager,
         research=research,
     )
-

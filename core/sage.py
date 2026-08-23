@@ -1,9 +1,10 @@
 ﻿from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from core.research import ResearchEngine
 from core.task_manager import TaskManager
+from core.context_compressor import ContextCompressor
 from inference.router import InferenceRouter
 from inference.routing import get_route
 from memory.bridge import MemoryBridge
@@ -36,6 +37,7 @@ class SageCore:
     task_manager: TaskManager
     research: ResearchEngine
 
+    context_compressor: ContextCompressor = field(default_factory=ContextCompressor)
     def _latest_user_message(
         self,
         messages: list[dict[str, str]],
@@ -208,9 +210,19 @@ class SageCore:
             ),
         }
 
+
+
+        compressed_conversation = self.context_compressor.compress_messages(
+            normalized_messages,
+        )
+
+        context_message["content"] = self.context_compressor.compress_context_message(
+            context_message["content"],
+        )
+
         final_messages = [
             context_message,
-            *normalized_messages,
+            *compressed_conversation,
         ]
 
         if tool_result["used_tool"]:
@@ -222,7 +234,7 @@ class SageCore:
                         f"Capability: {tool_result['capability']}\n"
                         f"Tool: {tool_result['tool']}\n"
                         f"Arguments: {tool_result['arguments']}\n"
-                        f"Result: {tool_result['result']}\n"
+                        f"Result: {self.context_compressor.compress_tool_result(tool_result['result'])}\n"
                         "[END TOOL RESULT]\n"
                         "Use the tool result and available evidence "
                         "to answer the user's request naturally."
@@ -239,6 +251,7 @@ class SageCore:
 
 def create_sage() -> SageCore:
     inference = InferenceRouter()
+    context_compressor = ContextCompressor()
     memory = MemoryBridge()
     memory_manager = MemoryManager(memory)
     evidence = __import__("core.evidence_store", fromlist=["EvidenceStore"]).EvidenceStore()
@@ -364,6 +377,7 @@ def create_sage() -> SageCore:
 
     return SageCore(
         inference=inference,
+        context_compressor=context_compressor,
         memory=memory,
         memory_manager=memory_manager,
         tools=tools,
@@ -371,3 +385,4 @@ def create_sage() -> SageCore:
         task_manager=task_manager,
         research=research,
     )
+

@@ -19,7 +19,7 @@ class InferenceConfig:
     ollama_base_url: str = "http://127.0.0.1:11434/v1"
 
     groq_chat_model: str = "openai/gpt-oss-20b"
-    ollama_chat_model: str = "qwen3:1.7b"
+    ollama_chat_model: str = "qwen2.5:3b"
 
 
 class InferenceRouter:
@@ -142,3 +142,4 @@ if __name__ == "__main__":
             provider="groq",
         )
     )
+

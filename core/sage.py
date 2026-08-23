@@ -127,6 +127,36 @@ class SageCore:
                         metadata={"query": args.get("query", "")},
                     )
 
+
+        elif tool_result["used_tool"] and tool_result["tool"] == "paperfind_search":
+            args = tool_result.get("arguments", {})
+            results = tool_result.get("result", [])
+
+            if isinstance(results, list):
+                for item in results:
+                    if isinstance(item, dict):
+                        self.research.evidence.add(
+                            conversation_id=conversation_id,
+                            source_type="academic_paper",
+                            title=str(item.get("title", "")),
+                            url=str(
+                                item.get("url")
+                                or item.get("pdf_url")
+                                or ""
+                            ),
+                            content=str(item.get("abstract", "")),
+                            metadata={
+                                "provider": args.get("provider", ""),
+                                "paper_id": item.get("paper_id", ""),
+                                "doi": item.get("doi", ""),
+                                "published_date": item.get(
+                                    "published_date",
+                                    "",
+                                ),
+                                "source": item.get("source", ""),
+                            },
+                        )
+
         elif tool_result["used_tool"] and tool_result["tool"] == "web_fetch":
             result = tool_result.get("result", {})
             if isinstance(result, dict):

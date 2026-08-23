@@ -55,6 +55,10 @@ class PermissionPolicy:
 
             # Document ingestion does not modify the source
             "docling_ingest": RiskLevel.SAFE,
+            "paper_search": RiskLevel.SAFE,
+            "paperfind_search": RiskLevel.SAFE,
+            "paper_read": RiskLevel.SAFE,
+            "paper_download": RiskLevel.APPROVAL,
 
             # Memory changes persistent user state
             "remember": RiskLevel.APPROVAL,

@@ -37,13 +37,13 @@ class InferenceRouter:
                     "Authorization": f"Bearer {self.config.groq_api_key}",
                     "Content-Type": "application/json",
                 },
-                timeout=120.0,
+                timeout=(300.0 if provider == "ollama" else 120.0),
             )
 
         return httpx.Client(
             base_url=self.config.ollama_base_url,
             headers={"Content-Type": "application/json"},
-            timeout=120.0,
+            timeout=(300.0 if provider == "ollama" else 120.0),
         )
 
     def chat(
@@ -142,3 +142,4 @@ if __name__ == "__main__":
             provider="groq",
         )
     )
+

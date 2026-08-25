@@ -321,6 +321,11 @@ class AgentExecutor:
                 "",
                 text,
             ).strip()
+            query = re.split(
+                r"(?i)\.\s*(?:for every|do not|don't|please cite|give me|provide|return)\b",
+                query,
+                maxsplit=1,
+            )[0].strip()
 
             return {
                 "use_tool": True,
@@ -541,15 +546,26 @@ Rules:
 
         raw = self.inference.chat(
             prompt,
-            provider="groq",
-            model="openai/gpt-oss-20b",
-        )
+            provider="ollama",
+            model="qwen2.5:3b",
+        ).strip()
+
+        if raw.startswith("```"):
+            raw = raw.removeprefix("```json").removeprefix("```").strip()
+            if raw.endswith("```"):
+                raw = raw[:-3].strip()
+
+        if not raw.startswith("{") or not raw.endswith("}"):
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start >= 0 and end > start:
+                raw = raw[start:end + 1]
 
         try:
             decision = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                f"Tool decision was not valid JSON: {raw}"
+                f"Local planner did not return valid JSON: {raw}"
             ) from exc
 
         if not isinstance(decision, dict):
@@ -954,3 +970,6 @@ Rules:
                 tool_name,
                 **arguments,
             )
+
+
+

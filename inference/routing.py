@@ -15,28 +15,28 @@ class WorkloadRoute:
 
 ROUTES: dict[str, WorkloadRoute] = {
     "chat": WorkloadRoute(
-        provider="groq",
-        model="openai/gpt-oss-20b",
+        provider="ollama",
+        model="qwen2.5:3b",
     ),
     "reasoning": WorkloadRoute(
-        provider="groq",
-        model="openai/gpt-oss-20b",
+        provider="ollama",
+        model="qwen2.5:3b",
     ),
     "agentic": WorkloadRoute(
-        provider="groq",
-        model="groq/compound",
+        provider="ollama",
+        model="qwen2.5:3b",
     ),
     "coding": WorkloadRoute(
-        provider="groq",
-        model="openai/gpt-oss-20b",
+        provider="ollama",
+        model="qwen2.5:3b",
     ),
     "private": WorkloadRoute(
         provider="ollama",
-        model="qwen3:1.7b",
+        model="qwen2.5:3b",
     ),
     "background": WorkloadRoute(
         provider="ollama",
-        model="qwen3:1.7b",
+        model="qwen2.5:3b",
     ),
 }
 
@@ -46,3 +46,4 @@ def get_route(workload: str) -> WorkloadRoute:
         return ROUTES[workload]
     except KeyError as exc:
         raise ValueError(f"Unknown workload: {workload}") from exc
+

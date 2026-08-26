@@ -1,52 +1,72 @@
-﻿# Environment / secrets
-.env
-.env.*
-!.env.example
-
-# Python
+﻿# Python
 __pycache__/
 *.py[cod]
-*.pyo
+*.pyd
 
-# Virtual environments
-.venv/
-.venv-*/
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+secrets/
+credentials/
 
-# IDE / editor
+# Local models / weights
+*.onnx
+*.onnx.json
+*.tflite
+*.bin
+*.gguf
+*.safetensors
+models/
+model/
+weights/
+
+# Audio/video test data
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.mp4
+*.avi
+*.mov
+
+# Local runtime/cache data
+cache/
+caches/
+logs/
+*.log
+data/
+.temp/
+tmp/
+
+# Large/tool payloads
+tools/audio/
+tools/image/
+tools/x64dbg-mcp/
+
+# Build/output folders
+dist/
+build/
+*.exe
+
+# Editor/OS
 .vscode/
 .idea/
-
-# Runtime data
-data/
-*.db
-*.sqlite
-*.sqlite3
-
-# Sage backups
-backups/
-backup-taskstate-*/
-
-# Browser/runtime artifacts
-browser/.cache/
-browser/downloads/
-browser/screenshots/
-
-# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
+# Temporary scripts generated during debugging
+workspace/*patch*.py
+workspace/*fix*.py
+workspace/*probe_fixed*.py
 
-# Temporary files
-*.tmp
-*.temp
-
-# Local workspace artifacts
-workspace/*.log
-workspace/*.tmp
-
-# Development backups
+# Sage backup/snapshot files
 *.bak-*
+*.bak
+backup-*/
+backups/
 
+# Local memory database/data
 memory/mempalace/

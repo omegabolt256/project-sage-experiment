@@ -1,45 +1,113 @@
-﻿# Sage Warden Memory Benchmark
+# Sage Benchmarks
 
-Target:
-- Windows laptop
-- ~8 GB physical RAM
-- CPU-only Warden test
+## Target machine
 
-## Integrated single-process result
+These measurements were made during the Sage experiment on the target Windows laptop.
 
-| Component | Integrated RSS delta |
+- OS: Windows
+- RAM class: ~8 GB
+- CPU-only Warden
+- Python-based orchestrator
+- 16 kHz mono audio for ASR tests
+
+The numbers below are experiment-specific.
+
+---
+
+## Warden — integrated single-process RSS
+
+| Stage | Increment | Cumulative RSS |
+|---|---:|---:|
+| Baseline | 21.5 MB | 21.5 MB |
+| Silero VAD | +39.6 MB | 61.1 MB |
+| Wake-word runtime proxy | +156.5 MB | 217.6 MB |
+| Streaming ASR | +133.2 MB | 350.8 MB |
+| Piper TTS | +68.2 MB | 419.1 MB |
+
+**Final measured Warden RSS: 419.1 MB**
+
+Soft ceiling: **500 MB**
+
+Hard ceiling: **750 MB**
+
+Headroom below soft ceiling: **80.9 MB**
+
+---
+
+## Warden — standalone process measurements
+
+| Component | Standalone delta |
 |---|---:|
-| Python baseline | 21.5 MB |
-| Silero VAD | +39.6 MB |
-| Wake-word runtime proxy | +156.5 MB |
-| Streaming ASR | +133.2 MB |
-| Piper TTS | +68.2 MB |
-| **Combined Warden RSS** | **419.1 MB** |
+| VAD | 39.4 MB |
+| Wake word | 192.6 MB |
+| Streaming ASR | 139.1 MB |
+| Piper | 116.1 MB |
 
-## Important comparison
+Naive separate-process sum including baseline:
 
-Earlier isolated-process measurements were approximately:
+**≈508.6 MB**
 
-- VAD: +39.4 MB
-- Wake word: +192.6 MB
-- Streaming ASR: +139.1 MB
-- Piper: +116.1 MB
+Integrated process:
 
-A naive sum produced approximately 508.6 MB, while the actual combined
-single-process result was approximately 419.1 MB.
+**419.1 MB**
 
-This demonstrates why the integrated benchmark is the meaningful measurement.
+Difference:
 
-## ASR experiment
+**≈89.5 MB**
 
-The Indian-English streaming Zipformer was approximately +133.2 MB in the
-integrated Warden test, but conversational testing showed poor recognition
-for the intended multilingual/Hinglish use case.
+Interpretation: runtime libraries, allocator behavior, and shared process state mean the naive sum is not the correct deployment budget.
 
-The experiment therefore separated:
-- streaming/low-memory suitability
-from
-- language suitability.
+---
 
-The model was useful as a benchmark, but was not accepted as the final Sage
-Hinglish ASR.
+## Piper
+
+Measured standalone process delta:
+
+**116.1 MB**
+
+Measured integrated Warden delta:
+
+**68.2 MB**
+
+The difference reinforced the need to benchmark the real integrated process.
+
+---
+
+## Streaming ASR candidate
+
+The first Warden streaming candidate was the Indian-English Zipformer.
+
+Integrated memory contribution:
+
+**+133.2 MB**
+
+The model passed the streaming/footprint test but failed the intended language-quality requirement for multilingual/Hinglish interaction.
+
+This was a useful negative result.
+
+---
+
+## Qwen3-ASR Worker experiment
+
+Successful local OpenASR run:
+
+- Model: Qwen3-ASR 0.6B q4
+- Audio: 10 s
+- CPU backend
+- Inference time: ≈4.38 s
+- RTF: ≈0.439x
+- Admitted model memory: ≈763 MB
+
+This strongly supported keeping the stronger ASR model as a Worker instead of a resident Warden model.
+
+---
+
+## Benchmark principle
+
+For local assistants:
+
+> **Measure resident RSS after loading the exact integrated process. Do not infer it from model-file size.**
+
+For streaming ASR:
+
+> **Measure language quality and memory together. A model that fits but cannot handle the target speech pattern is not a successful candidate.**
